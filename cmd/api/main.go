@@ -36,8 +36,8 @@ func main() {
 
 	defer db.Close()
 
-	log.Println("Conexão com PostgreSQL confirmada")
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /products", createProduct(db))
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
