@@ -24,11 +24,21 @@ func enableCORS(next http.Handler) http.Handler {
 	})
 }
 
+func getWebDir() string {
+	for _, path := range []string{"web", "../web", "../../web"} {
+		if fi, err := os.Stat(path); err == nil && fi.IsDir() {
+			return path
+		}
+	}
+	return "web"
+}
+
 func main() {
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		log.Fatal("Defina a variável DATABASE_URL")
+		databaseURL = "postgres://postgres:postgres@localhost:5432/stockflow?sslmode=disable"
+		log.Printf("Aviso: DATABASE_URL não definida. Usando conexão padrão: %s", databaseURL)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -36,7 +46,7 @@ func main() {
 	db, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
 		cancel()
-		log.Fatalf("Erro ao configurar o banco: %v", err)
+		log.Fatalf("Erro ao configurar conexão do banco: %v", err)
 	}
 
 	err = db.Ping(ctx)
@@ -44,7 +54,7 @@ func main() {
 
 	if err != nil {
 		db.Close()
-		log.Fatalf("Erro ao conectar ao PostgreSQL: %v", err)
+		log.Fatalf("\n❌ NãO FOI POSSíVEL CONECTAR AO POSTGRESQL!\nVerifique se o PostgreSQL está rodando e se a URL está correta.\nURL tentada: %s\nErro: %v\n\nDica: Você pode rodar 'docker-compose up -d' para subir o banco automaticamente.\n", databaseURL, err)
 	}
 
 	defer db.Close()
@@ -85,14 +95,20 @@ func main() {
 	})
 
 	// Servir arquivos estáticos do diretório web/
-	mux.Handle("/", http.FileServer(http.Dir("web")))
+	webPath := getWebDir()
+	log.Printf("Servindo frontend a partir de: %s", webPath)
+	mux.Handle("/", http.FileServer(http.Dir(webPath)))
 
 	server := &http.Server{
-		Addr:              "127.0.0.1:8081",
+		Addr:              ":8081",
 		Handler:           enableCORS(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	log.Println("Iniciando StockFlow em http://localhost:8081")
+	log.Println("======================================================")
+	log.Println("🚀 StockFlow rodando com sucesso!")
+	log.Println("🌐 Acesse no navegador: http://localhost:8081")
+	log.Println("🌐 Ou tente:            http://127.0.0.1:8081")
+	log.Println("======================================================")
 	log.Fatal(server.ListenAndServe())
 }
