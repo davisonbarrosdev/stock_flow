@@ -19,6 +19,9 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/001_create_products.sql
 
 ## Rotas
 
+- `GET /products/{id}`: consulta um produto; retorna 200, 400 para ID inválido, 404 se não existir ou 500 para falha no banco. Exemplo: `curl -i http://localhost:8081/products/1`.
+
+- `GET /products`: retorna uma lista JSON ordenada por ID, com status 200; sem produtos, retorna `[]`.
 - `GET /health`: verifica se a API está respondendo.
 - `POST /products`: cadastra um produto; retorna 201, 400 para dados inválidos, 409 para SKU duplicado ou 500 para falha no banco.
 
@@ -29,6 +32,12 @@ curl -i http://localhost:8081/products \
 ```
 
 SKU e nome são obrigatórios, com limites de 50 e 150 caracteres. Preço é informado em centavos; quantidades são inteiras. Preço e quantidades não podem ser negativos. Campos numéricos omitidos recebem zero.
+
+Para listar os produtos:
+
+```sh
+curl -i http://localhost:8081/products
+```
 
 ## Testes
 

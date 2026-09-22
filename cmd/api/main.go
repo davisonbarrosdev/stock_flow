@@ -38,6 +38,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /products", createProduct(db))
+	mux.HandleFunc("GET /products", listProducts(db))
+	mux.HandleFunc("GET /products/{id}", getProduct(db))
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

@@ -7,10 +7,12 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -73,5 +75,59 @@ func createProduct(db *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusCreated, result)
+	}
+}
+
+func listProducts(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		rows, err := db.Query(ctx, `SELECT id, sku, name, description, price_cents, stock_quantity, minimum_stock, created_at FROM products ORDER BY id ASC`)
+		if err != nil {
+			log.Printf("Erro ao listar produtos: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Não foi possível listar os produtos"})
+			return
+		}
+		defer rows.Close()
+		products := make([]product, 0)
+		for rows.Next() {
+			var item product
+			if err := rows.Scan(&item.ID, &item.SKU, &item.Name, &item.Description, &item.PriceCents, &item.StockQuantity, &item.MinimumStock, &item.CreatedAt); err != nil {
+				log.Printf("Erro ao ler produto: %v", err)
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Não foi possível listar os produtos"})
+				return
+			}
+			products = append(products, item)
+		}
+		if err := rows.Err(); err != nil {
+			log.Printf("Erro ao percorrer produtos: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Não foi possível listar os produtos"})
+			return
+		}
+		writeJSON(w, http.StatusOK, products)
+	}
+}
+
+func getProduct(db *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil || id <= 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "O ID deve ser um número inteiro positivo"})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		var item product
+		err = db.QueryRow(ctx, `SELECT id, sku, name, description, price_cents, stock_quantity, minimum_stock, created_at FROM products WHERE id = $1`, id).Scan(&item.ID, &item.SKU, &item.Name, &item.Description, &item.PriceCents, &item.StockQuantity, &item.MinimumStock, &item.CreatedAt)
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "Produto não encontrado"})
+			return
+		}
+		if err != nil {
+			log.Printf("Erro ao consultar produto: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Não foi possível consultar o produto"})
+			return
+		}
+		writeJSON(w, http.StatusOK, item)
 	}
 }
