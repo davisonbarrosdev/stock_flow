@@ -1,0 +1,15 @@
+# Binaries
+api
+*.exe
+*.exe;
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Environment & IDE
+.env
+.DS_Store
+.vscode/
+.idea/

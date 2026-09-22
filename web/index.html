@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="StockFlow — Sistema inteligente de controle de estoque e equipe.">
+  <title>StockFlow — Controle de Estoque & Funcionários</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+</head>
+<body>
+  <!-- Login Screen -->
+  <div class="login-screen active" id="login-screen">
+    <div class="login-card">
+      <div class="login-card__header">
+        <div class="login-card__icon">📦</div>
+        <h2>StockFlow</h2>
+        <p>Acesse o sistema de controle de estoque</p>
+      </div>
+      <form id="login-form" onsubmit="handleLoginSubmit(event)">
+        <div class="form-group">
+          <label class="form-label" for="login-email">E-mail</label>
+          <input type="email" class="form-input" id="login-email" placeholder="admin@stockflow.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="login-password">Senha</label>
+          <input type="password" class="form-input" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn--primary btn--full" id="btn-login">
+          Entrar no Sistema
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- App Main Content (Hidden until authenticated) -->
+  <div class="app-container" id="app-container" style="display: none;">
+
+    <!-- Header -->
+    <header class="app-header">
+      <div class="app-header__brand">
+        <div class="app-header__icon">📦</div>
+        <div>
+          <h1 class="app-header__title">StockFlow</h1>
+          <p class="app-header__subtitle">Controle Inteligente</p>
+        </div>
+      </div>
+
+      <div class="app-header__nav" id="admin-nav" style="display: none;">
+        <button class="nav-tab active" id="tab-products-btn" onclick="switchTab('products')">📦 Estoque</button>
+        <button class="nav-tab" id="tab-users-btn" onclick="switchTab('users')">👥 Funcionários</button>
+      </div>
+
+      <div class="app-header__user">
+        <div class="user-info">
+          <span class="user-info__name" id="user-display-name">Usuário</span>
+          <span class="user-info__role" id="user-display-role">ADMIN</span>
+        </div>
+        <button class="btn btn--secondary btn--sm" onclick="logout()">Sair</button>
+      </div>
+    </header>
+
+    <!-- Tab 1: Products & Dashboard -->
+    <div class="tab-content active" id="tab-products">
+      <!-- Dashboard Stats -->
+      <section class="dashboard-grid" id="dashboard-grid">
+        <div class="stat-card stat-card--products">
+          <div class="stat-card__header">
+            <span class="stat-card__label">Produtos</span>
+            <div class="stat-card__icon">📋</div>
+          </div>
+          <div class="stat-card__value" id="stat-total-products">—</div>
+        </div>
+
+        <div class="stat-card stat-card--items">
+          <div class="stat-card__header">
+            <span class="stat-card__label">Itens em Estoque</span>
+            <div class="stat-card__icon">📦</div>
+          </div>
+          <div class="stat-card__value" id="stat-total-items">—</div>
+        </div>
+
+        <div class="stat-card stat-card--value">
+          <div class="stat-card__header">
+            <span class="stat-card__label">Valor em Estoque</span>
+            <div class="stat-card__icon">💰</div>
+          </div>
+          <div class="stat-card__value" id="stat-total-value">—</div>
+        </div>
+
+        <div class="stat-card stat-card--alerts" id="stat-card-alerts">
+          <div class="stat-card__header">
+            <span class="stat-card__label">Estoque Baixo</span>
+            <div class="stat-card__icon">⚠️</div>
+          </div>
+          <div class="stat-card__value" id="stat-low-stock">—</div>
+        </div>
+      </section>
+
+      <!-- Products List -->
+      <section class="products-section">
+        <div class="products-header">
+          <h2 class="products-header__title">Produtos Cadastrados</h2>
+          <div class="products-header__controls">
+            <div class="search-input">
+              <span class="search-input__icon">🔍</span>
+              <input type="text" class="search-input__field" id="search-field" placeholder="Buscar por nome ou SKU..." oninput="filterProducts()">
+            </div>
+            <button class="btn btn--primary admin-only" id="btn-new-product" onclick="openCreateModal()">
+              <span>＋</span> Novo Produto
+            </button>
+          </div>
+        </div>
+
+        <div class="products-table-wrapper">
+          <table class="products-table" id="products-table">
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Produto</th>
+                <th>Preço</th>
+                <th>Estoque</th>
+                <th>Mín.</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="products-tbody">
+            </tbody>
+          </table>
+          <div class="empty-state" id="empty-state" style="display: none;">
+            <div class="empty-state__icon">📭</div>
+            <h3 class="empty-state__title">Nenhum produto cadastrado</h3>
+            <p class="empty-state__text">Clique em "Novo Produto" para começar a gerenciar seu estoque.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Tab 2: Employee / User Management (Admin Only) -->
+    <div class="tab-content" id="tab-users" style="display: none;">
+      <section class="products-section">
+        <div class="products-header">
+          <h2 class="products-header__title">Gestão de Funcionários & Usuários</h2>
+          <div class="products-header__controls">
+            <button class="btn btn--primary" onclick="openUserModal()">
+              <span>＋</span> Novo Funcionário
+            </button>
+          </div>
+        </div>
+
+        <div class="products-table-wrapper">
+          <table class="products-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>E-mail</th>
+                <th>Cargo / Função</th>
+                <th>Cadastrado em</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+  </div>
+
+  <!-- Modal: Create / Edit Product -->
+  <div class="modal-overlay" id="modal-product">
+    <div class="modal">
+      <div class="modal__header">
+        <h3 class="modal__title" id="modal-product-title">Novo Produto</h3>
+        <button class="modal__close" onclick="closeModal('modal-product')">✕</button>
+      </div>
+      <div class="modal__body">
+        <form id="product-form" onsubmit="handleProductSubmit(event)">
+          <input type="hidden" id="form-product-id">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="form-sku">SKU</label>
+              <input type="text" class="form-input" id="form-sku" placeholder="EX: PROD-001" maxlength="50" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="form-name">Nome</label>
+              <input type="text" class="form-input" id="form-name" placeholder="Nome do produto" maxlength="150" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="form-description">Descrição</label>
+            <textarea class="form-input" id="form-description" placeholder="Descrição do produto (opcional)"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="form-price">Preço (R$)</label>
+              <input type="number" class="form-input" id="form-price" placeholder="0,00" min="0" step="0.01" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="form-stock">Quantidade</label>
+              <input type="number" class="form-input" id="form-stock" placeholder="0" min="0" step="1" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="form-minimum">Estoque Mínimo</label>
+            <input type="number" class="form-input" id="form-minimum" placeholder="0" min="0" step="1" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--secondary" onclick="closeModal('modal-product')">Cancelar</button>
+        <button class="btn btn--primary" id="btn-submit-product" onclick="document.getElementById('product-form').requestSubmit()">Salvar Produto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Adjust Stock -->
+  <div class="modal-overlay" id="modal-stock">
+    <div class="modal">
+      <div class="modal__header">
+        <h3 class="modal__title">Ajustar Estoque</h3>
+        <button class="modal__close" onclick="closeModal('modal-stock')">✕</button>
+      </div>
+      <div class="modal__body">
+        <div class="stock-adjust">
+          <p class="stock-adjust__current">
+            Estoque atual de <strong id="stock-product-name"></strong>: <span id="stock-current-qty">0</span>
+          </p>
+          <input type="hidden" id="stock-product-id">
+          <div class="stock-adjust__controls">
+            <button class="stock-adjust__btn stock-adjust__btn--minus" onclick="changeStockQty(-1)">−</button>
+            <input type="number" class="stock-adjust__value" id="stock-adjust-qty" value="1" min="1">
+            <button class="stock-adjust__btn stock-adjust__btn--plus" onclick="changeStockQty(1)">＋</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--danger" onclick="submitStockAdjust(-1)">
+          <span>↓</span> Saída
+        </button>
+        <button class="btn btn--primary" style="background: var(--gradient-success);" onclick="submitStockAdjust(1)">
+          <span>↑</span> Entrada
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Create User / Employee -->
+  <div class="modal-overlay" id="modal-user">
+    <div class="modal">
+      <div class="modal__header">
+        <h3 class="modal__title">Cadastrar Funcionário</h3>
+        <button class="modal__close" onclick="closeModal('modal-user')">✕</button>
+      </div>
+      <div class="modal__body">
+        <form id="user-form" onsubmit="handleUserSubmit(event)">
+          <div class="form-group">
+            <label class="form-label" for="user-name">Nome Completo</label>
+            <input type="text" class="form-input" id="user-name" placeholder="Ex: João da Silva" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="user-email">E-mail</label>
+            <input type="email" class="form-input" id="user-email" placeholder="funcionario@empresa.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="user-password">Senha de Acesso</label>
+            <input type="password" class="form-input" id="user-password" placeholder="Mínimo 6 caracteres" minlength="6" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="user-role">Cargo / Perfil</label>
+            <select class="form-input" id="user-role" required>
+              <option value="employee">Funcionário (Apenas ajuste de estoque)</option>
+              <option value="admin">Administrador (Acesso total)</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--secondary" onclick="closeModal('modal-user')">Cancelar</button>
+        <button class="btn btn--primary" onclick="document.getElementById('user-form').requestSubmit()">Cadastrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirm Delete Product -->
+  <div class="modal-overlay" id="modal-confirm">
+    <div class="modal" style="max-width: 400px;">
+      <div class="modal__header">
+        <h3 class="modal__title">Confirmar Exclusão</h3>
+        <button class="modal__close" onclick="closeModal('modal-confirm')">✕</button>
+      </div>
+      <div class="modal__body">
+        <div class="confirm-dialog">
+          <div class="confirm-dialog__icon">🗑️</div>
+          <h4 class="confirm-dialog__title">Tem certeza?</h4>
+          <p class="confirm-dialog__text">
+            O produto <strong id="confirm-product-name"></strong> será removido permanentemente.
+          </p>
+          <input type="hidden" id="confirm-product-id">
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--secondary" onclick="closeModal('modal-confirm')">Cancelar</button>
+        <button class="btn btn--danger" onclick="confirmDelete()">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

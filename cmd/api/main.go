@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+func enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 
 	databaseURL := os.Getenv("DATABASE_URL")
@@ -36,11 +49,28 @@ func main() {
 
 	defer db.Close()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /products", createProduct(db))
-	mux.HandleFunc("GET /products", listProducts(db))
-	mux.HandleFunc("GET /products/{id}", getProduct(db))
+	// Garantir que a tabela de usuários exista/admin inicial seja configurado
+	ensureAdminUser(db)
 
+	mux := http.NewServeMux()
+
+	// Auth & Users
+	mux.HandleFunc("POST /login", loginUser(db))
+	mux.HandleFunc("GET /me", requireAuth(getMe(db)))
+	mux.HandleFunc("GET /users", requireAdmin(listUsers(db)))
+	mux.HandleFunc("POST /users", requireAdmin(createUser(db)))
+	mux.HandleFunc("DELETE /users/{id}", requireAdmin(deleteUser(db)))
+
+	// Products (Leitura = qualquer usuário logado; Alteração = Admin; Estoque = Auth)
+	mux.HandleFunc("GET /products", requireAuth(listProducts(db)))
+	mux.HandleFunc("GET /products/{id}", requireAuth(getProduct(db)))
+	mux.HandleFunc("POST /products", requireAdmin(createProduct(db)))
+	mux.HandleFunc("PUT /products/{id}", requireAdmin(updateProduct(db)))
+	mux.HandleFunc("DELETE /products/{id}", requireAdmin(deleteProduct(db)))
+	mux.HandleFunc("PATCH /products/{id}/stock", requireAuth(adjustStock(db)))
+	mux.HandleFunc("GET /dashboard", requireAuth(dashboardStats(db)))
+
+	// Health Check
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -54,9 +84,12 @@ func main() {
 		}
 	})
 
+	// Servir arquivos estáticos do diretório web/
+	mux.Handle("/", http.FileServer(http.Dir("web")))
+
 	server := &http.Server{
 		Addr:              "127.0.0.1:8081",
-		Handler:           mux,
+		Handler:           enableCORS(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
