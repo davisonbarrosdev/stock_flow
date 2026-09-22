@@ -64,18 +64,20 @@ func ensureAdminUser(db *pgxpool.Pool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var count int
-	err := db.QueryRow(ctx, `SELECT count(*) FROM users`).Scan(&count)
+	hash, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+	if err != nil {
+		log.Printf("Erro ao gerar hash da senha admin: %v", err)
+		return
+	}
+
+	var exists bool
+	err = db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(email) = 'admin@stockflow.com')`).Scan(&exists)
 	if err != nil {
 		log.Printf("Aviso: Tabela 'users' ainda não existe ou erro ao verificar: %v", err)
 		return
 	}
 
-	if count == 0 {
-		hash, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
-		if err != nil {
-			log.Fatalf("Erro ao gerar hash da senha admin: %v", err)
-		}
+	if !exists {
 		_, err = db.Exec(ctx, `
 			INSERT INTO users (name, email, password_hash, role)
 			VALUES ($1, $2, $3, $4)
@@ -84,6 +86,13 @@ func ensureAdminUser(db *pgxpool.Pool) {
 			log.Printf("Erro ao criar admin padrão: %v", err)
 		} else {
 			log.Println("==> Usuário Admin criado com sucesso: admin@stockflow.com / admin123")
+		}
+	} else {
+		var currentHash string
+		_ = db.QueryRow(ctx, `SELECT password_hash FROM users WHERE LOWER(email) = 'admin@stockflow.com'`).Scan(&currentHash)
+		if bcrypt.CompareHashAndPassword([]byte(currentHash), []byte("admin123")) != nil {
+			_, _ = db.Exec(ctx, `UPDATE users SET password_hash = $1 WHERE LOWER(email) = 'admin@stockflow.com'`, string(hash))
+			log.Println("==> Senha do Admin redefinida para 'admin123'")
 		}
 	}
 }

@@ -29,14 +29,5 @@ CREATE TABLE IF NOT EXISTS users (
     CHECK (length(trim(email)) > 0)
 );
 
--- 3. Inserir Administrador Padrão (se não existir nenhum usuário)
--- Email: admin@stockflow.com | Senha: admin123 (hash bcrypt)
-INSERT INTO users (name, email, password_hash, role)
-SELECT 
-    'Administrador Geral', 
-    'admin@stockflow.com', 
-    '$2a$10$3zR1Y0hQZ1bE64d4G1w4e.W7uP9/0pM9aO3zR1Y0hQZ1bE64d4G1w', -- Hash bcrypt de 'admin123'
-    'admin'
-WHERE NOT EXISTS (SELECT 1 FROM users);
-
 COMMIT;
+-- O usuário administrador é autogerado e garantido na inicialização da API Go com hash bcrypt válido.
