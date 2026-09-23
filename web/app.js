@@ -20,6 +20,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── API Helper with Token Header ──
 async function apiFetch(endpoint, options = {}) {
+  if (!['http:', 'https:'].includes(window.location.protocol)) {
+    throw new Error('Abra o sistema em http://localhost:8081 com a API Go em execução. O login não funciona abrindo o arquivo HTML diretamente.');
+  }
+
   const url = `${API_BASE}${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',
@@ -28,16 +32,31 @@ async function apiFetch(endpoint, options = {}) {
   };
 
   const config = { ...options, headers };
-  const response = await fetch(url, config);
-  const data = await response.json();
+  let response;
+  try {
+    response = await fetch(url, config);
+  } catch (err) {
+    throw new Error('Não foi possível conectar à API. Verifique se ela está em execução e acesse http://localhost:8081.');
+  }
 
   if (response.status === 401 && endpoint !== '/login') {
     logout();
     throw new Error('Sessão expirada. Faça login novamente.');
   }
 
+  if (!(response.headers.get('Content-Type') || '').toLowerCase().includes('application/json')) {
+    throw new Error(`O servidor retornou uma resposta inesperada (HTTP ${response.status}). Acesse o sistema pela API Go em http://localhost:8081.`);
+  }
+
+  let data;
+  try {
+    data = await response.json();
+  } catch (err) {
+    throw new Error('A API retornou uma resposta JSON inválida. Verifique os logs do servidor.');
+  }
+
   if (!response.ok) {
-    throw new Error(data.error || `Erro ${response.status}`);
+    throw new Error(data?.error || `Erro ${response.status}`);
   }
 
   return data;
